@@ -26,6 +26,16 @@ public class ProjectConfig {
     private String mavenVersion;
     
     private List<Dependency> dependencies;
+    private String template;
+    
+    @JsonProperty("dockerTemplate")
+    private String dockerTemplate;
+    
+    @JsonProperty("cicdTemplate")
+    private String cicdTemplate;
+    
+    @JsonProperty("advancedMaven")
+    private Boolean advancedMaven;
 
     // Default constructor
     public ProjectConfig() {}
@@ -60,4 +70,16 @@ public class ProjectConfig {
 
     public List<Dependency> getDependencies() { return dependencies; }
     public void setDependencies(List<Dependency> dependencies) { this.dependencies = dependencies; }
+
+    public String getTemplate() { return template; }
+    public void setTemplate(String template) { this.template = template; }
+
+    public String getDockerTemplate() { return dockerTemplate; }
+    public void setDockerTemplate(String dockerTemplate) { this.dockerTemplate = dockerTemplate; }
+
+    public String getCicdTemplate() { return cicdTemplate; }
+    public void setCicdTemplate(String cicdTemplate) { this.cicdTemplate = cicdTemplate; }
+
+    public Boolean getAdvancedMaven() { return advancedMaven; }
+    public void setAdvancedMaven(Boolean advancedMaven) { this.advancedMaven = advancedMaven; }
 }

@@ -6,13 +6,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Download, Search, X, Package, Code, Settings, BookOpen, Loader2, Sparkles, Zap, Shield, Rocket } from "lucide-react"
+import { Download, Search, X, Package, Code, Settings, BookOpen, Loader2, Sparkles, Zap, Shield, Rocket, FileText, Wrench, Container, GitBranch } from "lucide-react"
 import { validateProjectConfig, validateDependencies, type ValidationError } from "@/lib/validation"
 import { ValidationAlert, ValidationSuccess } from "@/components/validation-alert"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { ValidatedInput, ValidatedTextarea, ValidatedSelect } from "@/components/validated-input"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ProjectPreview } from "@/components/project-preview"
+import { dependencies, categories, popularDependencies, searchDependencies } from "./dependencies"
+import { projectTemplates, templateCategories, getTemplateById } from "./templates"
+import { getDefaultMavenConfig, getSpringBootMavenConfig, getFullMavenConfig } from "./maven-config"
+import { dockerTemplates, cicdTemplates, getDockerTemplateById, getCICDTemplateById } from "./cicd-templates"
 
 interface Dependency {
   id: string
@@ -22,102 +27,9 @@ interface Dependency {
   groupId: string
   artifactId: string
   version: string
+  tags?: string[]
+  popular?: boolean
 }
-
-const dependencies: Dependency[] = [
-  {
-    id: "junit",
-    name: "JUnit",
-    description: "Unit testing framework",
-    category: "Testing",
-    groupId: "org.junit.jupiter",
-    artifactId: "junit-jupiter",
-    version: "5.10.0",
-  },
-  {
-    id: "mockito",
-    name: "Mockito",
-    description: "Mocking framework",
-    category: "Testing",
-    groupId: "org.mockito",
-    artifactId: "mockito-core",
-    version: "5.5.0",
-  },
-  {
-    id: "jackson",
-    name: "Jackson",
-    description: "JSON processing library",
-    category: "JSON",
-    groupId: "com.fasterxml.jackson.core",
-    artifactId: "jackson-databind",
-    version: "2.15.2",
-  },
-  {
-    id: "gson",
-    name: "Gson",
-    description: "JSON serialization library",
-    category: "JSON",
-    groupId: "com.google.code.gson",
-    artifactId: "gson",
-    version: "2.10.1",
-  },
-  {
-    id: "slf4j",
-    name: "SLF4J",
-    description: "Logging facade",
-    category: "Logging",
-    groupId: "org.slf4j",
-    artifactId: "slf4j-api",
-    version: "2.0.9",
-  },
-  {
-    id: "logback",
-    name: "Logback",
-    description: "Logging implementation",
-    category: "Logging",
-    groupId: "ch.qos.logback",
-    artifactId: "logback-classic",
-    version: "1.4.11",
-  },
-  {
-    id: "commons-lang",
-    name: "Apache Commons Lang",
-    description: "Utility classes",
-    category: "Utilities",
-    groupId: "org.apache.commons",
-    artifactId: "commons-lang3",
-    version: "3.13.0",
-  },
-  {
-    id: "guava",
-    name: "Google Guava",
-    description: "Core libraries",
-    category: "Utilities",
-    groupId: "com.google.guava",
-    artifactId: "guava",
-    version: "32.1.2-jre",
-  },
-  {
-    id: "hibernate",
-    name: "Hibernate",
-    description: "ORM framework",
-    category: "Database",
-    groupId: "org.hibernate.orm",
-    artifactId: "hibernate-core",
-    version: "6.3.1.Final",
-  },
-  {
-    id: "mysql",
-    name: "MySQL Driver",
-    description: "MySQL JDBC driver",
-    category: "Database",
-    groupId: "com.mysql",
-    artifactId: "mysql-connector-j",
-    version: "8.1.0",
-  },
-]
-
-const categories = Array.from(new Set(dependencies.map((d) => d.category)))
 
 export default function MavenInitializer() {
   const [projectConfig, setProjectConfig] = useState({
@@ -136,6 +48,10 @@ export default function MavenInitializer() {
   const [searchTerm, setSearchTerm] = useState("")
   const [activeCategory, setActiveCategory] = useState("All")
   const [isGenerating, setIsGenerating] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [selectedDockerTemplate, setSelectedDockerTemplate] = useState<string | null>(null)
+  const [selectedCICDTemplate, setSelectedCICDTemplate] = useState<string | null>(null)
 
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([])
   const [dependencyErrors, setDependencyErrors] = useState<ValidationError[]>([])
@@ -148,7 +64,8 @@ export default function MavenInitializer() {
   const filteredDependencies = dependencies.filter((dep) => {
     const matchesSearch =
       dep.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dep.description.toLowerCase().includes(searchTerm.toLowerCase())
+      dep.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dep.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesCategory = activeCategory === "All" || dep.category === activeCategory
     return matchesSearch && matchesCategory
   })
@@ -161,11 +78,21 @@ export default function MavenInitializer() {
     setSelectedDependencies((prev) => prev.filter((id) => id !== depId))
   }
 
-  const validateConfiguration = () => {
-    // Validate project configuration
-    const configValidation = validateProjectConfig(projectConfig)
+  const applyTemplate = (templateId: string) => {
+    const template = getTemplateById(templateId)
+    if (template) {
+      setProjectConfig(prev => ({
+        ...prev,
+        javaVersion: template.javaVersion,
+        packaging: template.packaging,
+      }))
+      setSelectedDependencies(template.dependencies)
+      setSelectedTemplate(templateId)
+    }
+  }
 
-    // Validate dependencies
+  const validateConfiguration = () => {
+    const configValidation = validateProjectConfig(projectConfig)
     const selectedDeps = dependencies.filter((dep) => selectedDependencies.includes(dep.id))
     const depValidation = validateDependencies(selectedDeps)
 
@@ -177,7 +104,6 @@ export default function MavenInitializer() {
   }
 
   const generateProject = async () => {
-    // Validate before generating
     if (!validateConfiguration()) {
       return
     }
@@ -194,6 +120,10 @@ export default function MavenInitializer() {
         body: JSON.stringify({
           ...projectConfig,
           dependencies: selectedDeps,
+          template: selectedTemplate,
+          dockerTemplate: selectedDockerTemplate,
+          cicdTemplate: selectedCICDTemplate,
+          advancedMaven: showAdvanced,
         }),
       })
 
@@ -201,7 +131,6 @@ export default function MavenInitializer() {
         throw new Error("Failed to generate project")
       }
 
-      // Get the blob and create download
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -300,7 +229,59 @@ export default function MavenInitializer() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Project Configuration */}
           <div className="lg:col-span-2 space-y-6">
-            <Card className="border-0 shadow-lg bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm hover-lift">
+            {/* Project Templates */}
+            <Card className="border-0 shadow-lg bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <FileText className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  Project Templates
+                </CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">
+                  Choose a predefined template to get started quickly
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {projectTemplates.map((template) => (
+                    <div
+                      key={template.id}
+                      className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+                        selectedTemplate === template.id
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                          : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                      }`}
+                      onClick={() => applyTemplate(template.id)}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-2xl">{template.icon}</span>
+                        <div>
+                          <h3 className="font-medium text-sm">{template.name}</h3>
+                          <p className="text-xs text-slate-500">{template.category}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
+                        {template.description}
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {template.features.slice(0, 3).map((feature, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {feature}
+                          </Badge>
+                        ))}
+                        {template.features.length > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{template.features.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Project Configuration */}
+            <Card className="border-0 shadow-lg bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-xl">
                   <Settings className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -411,7 +392,7 @@ export default function MavenInitializer() {
             </Card>
 
             {/* Dependencies */}
-            <Card className="border-0 shadow-lg bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm hover-lift">
+            <Card className="border-0 shadow-lg bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-xl">
                   <Code className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -462,13 +443,27 @@ export default function MavenInitializer() {
                               className="mt-1"
                             />
                             <div className="flex-1 min-w-0">
-                              <label htmlFor={dep.id} className="text-sm font-medium cursor-pointer group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                {dep.name}
-                              </label>
+                              <div className="flex items-center gap-2">
+                                <label htmlFor={dep.id} className="text-sm font-medium cursor-pointer group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                  {dep.name}
+                                </label>
+                                {dep.popular && (
+                                  <Badge variant="secondary" className="text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
+                                    Popular
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{dep.description}</p>
-                              <Badge variant="secondary" className="mt-2 text-xs bg-slate-100 dark:bg-slate-600 text-slate-700 dark:text-slate-300">
-                                {dep.category}
-                              </Badge>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Badge variant="secondary" className="text-xs bg-slate-100 dark:bg-slate-600 text-slate-700 dark:text-slate-300">
+                                  {dep.category}
+                                </Badge>
+                                {dep.tags && dep.tags.slice(0, 2).map((tag, index) => (
+                                  <Badge key={index} variant="outline" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -478,11 +473,78 @@ export default function MavenInitializer() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Advanced Options */}
+            <Card className="border-0 shadow-lg bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Wrench className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  Advanced Options
+                </CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">
+                  Additional configuration options
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">Advanced Maven Configuration</h3>
+                    <p className="text-sm text-slate-500">Include additional Maven plugins and properties</p>
+                  </div>
+                  <Checkbox
+                    checked={showAdvanced}
+                    onCheckedChange={setShowAdvanced}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Docker Template</Label>
+                    <select
+                      value={selectedDockerTemplate || ""}
+                      onChange={(e) => setSelectedDockerTemplate(e.target.value || null)}
+                      className="w-full mt-1 p-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800"
+                    >
+                      <option value="">No Docker</option>
+                      {dockerTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium">CI/CD Template</Label>
+                    <select
+                      value={selectedCICDTemplate || ""}
+                      onChange={(e) => setSelectedCICDTemplate(e.target.value || null)}
+                      className="w-full mt-1 p-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800"
+                    >
+                      <option value="">No CI/CD</option>
+                      {cicdTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Project Summary */}
+          {/* Project Summary & Preview */}
           <div className="space-y-6">
-            <Card className="sticky top-4 border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover-lift">
+            <ProjectPreview
+              projectConfig={projectConfig}
+              dependencies={dependencies.filter((dep) => selectedDependencies.includes(dep.id))}
+              onDownload={generateProject}
+              isGenerating={isGenerating}
+            />
+
+            {/* Project Summary */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl">Project Summary</CardTitle>
                 <CardDescription className="text-slate-600 dark:text-slate-400">
@@ -540,25 +602,6 @@ export default function MavenInitializer() {
                   </div>
                 )}
 
-                <Button
-                  onClick={generateProject}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                  size="lg"
-                  disabled={isGenerating || !isConfigValid}
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Generate Project
-                    </>
-                  )}
-                </Button>
-
                 <div className="text-xs text-slate-500 dark:text-slate-400 space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
@@ -572,6 +615,18 @@ export default function MavenInitializer() {
                     <div className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
                     <p>Ready to import in your IDE</p>
                   </div>
+                  {selectedDockerTemplate && (
+                    <div className="flex items-center gap-2">
+                      <Container className="w-3 h-3 text-blue-500" />
+                      <p>Docker configuration included</p>
+                    </div>
+                  )}
+                  {selectedCICDTemplate && (
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="w-3 h-3 text-green-500" />
+                      <p>CI/CD pipeline included</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
