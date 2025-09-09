@@ -1,0 +1,5 @@
+/Users/mac/maven/maven-initializer/backend/src/main/java/com/maven/initializer/model/ProjectConfig.java
+/Users/mac/maven/maven-initializer/backend/src/main/java/com/maven/initializer/service/ProjectGeneratorService.java
+/Users/mac/maven/maven-initializer/backend/src/main/java/com/maven/initializer/controller/ProjectController.java
+/Users/mac/maven/maven-initializer/backend/src/main/java/com/maven/initializer/MavenInitializerApplication.java
+/Users/mac/maven/maven-initializer/backend/src/main/java/com/maven/initializer/model/Dependency.java

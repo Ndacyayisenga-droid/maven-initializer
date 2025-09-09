@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Frontend-Backend Connection</title>
+</head>
+<body>
+    <h1>Test Maven Initializer Backend</h1>
+    <button onclick="testBackend()">Test Backend Connection</button>
+    <div id="result"></div>
+
+    <script>
+        async function testBackend() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        groupId: 'com.example',
+                        artifactId: 'test-project',
+                        version: '1.0.0',
+                        name: 'Test Project',
+                        description: 'A test project',
+                        packageName: 'com.example.testproject',
+                        packaging: 'jar',
+                        javaVersion: '17',
+                        mavenVersion: '3.9.0',
+                        dependencies: []
+                    })
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'test-project.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    resultDiv.innerHTML = '✅ SUCCESS: ZIP file downloaded!';
+                } else {
+                    resultDiv.innerHTML = `❌ ERROR: ${response.status} ${response.statusText}`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ ERROR: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
