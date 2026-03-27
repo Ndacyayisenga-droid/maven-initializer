@@ -1,7 +1,7 @@
 package com.maven.initializer.controller;
 
 import com.maven.initializer.model.ProjectConfig;
-import com.maven.initializer.service.ProjectGeneratorService;
+import com.maven.initializer.service.EnhancedProjectGeneratorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -19,7 +19,7 @@ import java.util.Map;
 public class ProjectController {
 
     @Autowired
-    private ProjectGeneratorService projectGeneratorService;
+    private EnhancedProjectGeneratorService projectGeneratorService;
 
     @PostMapping("/generate")
     public ResponseEntity<?> generateProject(@RequestBody ProjectConfig config) {
@@ -37,6 +37,12 @@ public class ProjectController {
             if (config.getPackageName() == null || config.getPackageName().trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(createErrorResponse("Package name is required"));
             }
+
+            System.out.println("Generating project for: " + config.getArtifactId());
+            System.out.println("Dependencies count: " + (config.getDependencies() != null ? config.getDependencies().size() : 0));
+            System.out.println("Template: " + config.getTemplate());
+            System.out.println("Docker Template: " + config.getDockerTemplate());
+            System.out.println("CI/CD Template: " + config.getCicdTemplate());
 
             byte[] zipData = projectGeneratorService.generateProject(config);
             

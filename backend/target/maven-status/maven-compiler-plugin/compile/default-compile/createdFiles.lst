@@ -1,5 +1,6 @@
 com/maven/initializer/model/Dependency.class
 com/maven/initializer/service/ProjectGeneratorService.class
-com/maven/initializer/MavenInitializerApplication.class
 com/maven/initializer/controller/ProjectController.class
+com/maven/initializer/service/EnhancedProjectGeneratorService.class
+com/maven/initializer/MavenInitializerApplication.class
 com/maven/initializer/model/ProjectConfig.class
